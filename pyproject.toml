@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "discord-mpris"
+version = "0.1.0"
+description = "Show MPRIS music playback as Discord Rich Presence"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "dbus-fast==5.2.0",
+    "pypresence==4.6.2",
+]
+
+[project.scripts]
+discord-mpris = "discord_mpris.service:run"
+
+[tool.setuptools.packages.find]
+where = ["src"]

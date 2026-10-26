@@ -2,7 +2,7 @@
 
 A small Linux service that reads the currently playing track from MPRIS and shows it as Discord Rich Presence.
 
-It works with MPRIS-compatible players on GNOME, KDE, and other Linux desktops, including GNOME Music.
+It works with MPRIS-compatible players on GNOME, KDE, and other Linux desktops.
 
 ## Features
 
@@ -40,7 +40,7 @@ python -m pip install -r requirements.txt
 The service uses a Discord Application ID and the image asset keys `play` and `pause` for playback status. Cover art is looked up per album.
 
 1. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications).
-2. Copy its Application ID into the `Presence(...)` call in `main.py`.
+2. Copy its Application ID into the `Presence(...)` call in `src/discord_mpris/discord_presence.py`.
 3. Add image assets named `play` and `pause` under **Rich Presence > Art Assets** in the application settings.
 4. In Discord, enable **User Settings > Activity Privacy > Share your detected activities with others**.
 
@@ -50,7 +50,13 @@ Keep Discord open, activate the virtual environment, then start the service:
 
 ```bash
 source .venv/bin/activate
-python main.py
+python -m discord_mpris
+```
+
+Alternatively, run the installed command:
+
+```bash
+discord-mpris
 ```
 
 Press `Ctrl+C` to stop it. The service clears the Discord activity when no playing or paused MPRIS player is available.
@@ -58,5 +64,17 @@ Press `Ctrl+C` to stop it. The service clears the Discord activity when no playi
 ## Troubleshooting
 
 - **No activity appears:** Use the Discord desktop app, check the activity-privacy setting, and verify that your player is exposing MPRIS metadata.
-- **Missing image:** Confirm the three image asset keys are uploaded to the Discord application used by the service.
+- **Missing playback icon:** Confirm the `play` and `pause` image assets are uploaded to the Discord application used by the service.
 - **No connection to Discord at startup:** Leave Discord open; the service retries the connection every 10 seconds.
+
+## Development
+
+Run the test suite with the standard library:
+
+```bash
+python -m unittest discover -s tests
+```
+
+## AI Disclosure
+
+This repository is primarily written with the assistance of AI tools.
