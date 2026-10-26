@@ -90,8 +90,11 @@ def fetch_cover_art(artists, album):
         {"query": query, "fmt": "json", "limit": 10}
     )
     request = Request(search_url, headers={"User-Agent": USER_AGENT})
-    with urlopen(request, timeout=8) as response:
-        releases = json.load(response).get("releases", [])
+    try:
+        with urlopen(request, timeout=8) as response:
+            releases = json.load(response).get("releases", [])
+    except (OSError, ValueError, TimeoutError) as error:
+        raise OSError(f"MusicBrainz API request failed: {error}") from error
 
     wanted_artists = {normalize_text(artist) for artist in artists}
     for release in releases:
@@ -116,8 +119,15 @@ def fetch_cover_art(artists, album):
             with urlopen(cover_request, timeout=8):
                 return cover_url
         except HTTPError as error:
-            if error.code != 404:
-                raise
+            if error.code == 404:
+                continue
+            raise OSError(
+                f"Cover Art Archive request for release {release_id} failed: {error}"
+            ) from error
+        except (OSError, TimeoutError) as error:
+            raise OSError(
+                f"Cover Art Archive request for release {release_id} failed: {error}"
+            ) from error
 
     return None
 
@@ -141,7 +151,7 @@ async def find_cover_art(artists, album):
         cover_url = await asyncio.to_thread(fetch_cover_art, artists, album)
     except (OSError, ValueError, TimeoutError) as error:
         print(f"Cover lookup failed: {error}")
-        cover_url = None
+        return None
 
     MUSICBRAINZ_CACHE[cache_key] = cover_url
     return cover_url
@@ -219,8 +229,7 @@ async def refresh_presence(bus):
         if not isinstance(cover_url, str) or not cover_url.startswith("https://"):
             cover_url = await find_cover_art(player["artists"], player["album"])
 
-        label = "Listen" if status == "Playing" else "Paused"
-        activity_name = f"{label}: {song}" if song else "Music"
+        activity_name = song or "Music"
         if len(activity_name) > 128:
             activity_name = activity_name[:125].rstrip() + "..."
 
