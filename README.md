@@ -4,6 +4,10 @@ A small Linux service that reads the currently playing track from MPRIS and show
 
 It works with MPRIS-compatible players on GNOME, KDE, and other Linux desktops.
 
+## Project Origin
+
+This project started from [RayzrDev/discord-rpc-mpris](https://github.com/rayzrdev/discord-rpc-mpris). The current implementation has since been rewritten from scratch, but i want to appreciate their work.
+
 ## Features
 
 - Shows the current track and artist in Discord.
@@ -12,7 +16,7 @@ It works with MPRIS-compatible players on GNOME, KDE, and other Linux desktops.
 - Shows whether playback is active or paused.
 - Prefers a playing player when more than one MPRIS player is available.
 
-If no cover is available from the player or the Cover Art Archive, no large image is set. Cover lookup requires an internet connection. Results, including misses, are cached until the service exits.
+If no cover is available from the player or the Cover Art Archive, no large image is set. Results, including misses, are cached until the service exits.
 
 ## Requirements
 
@@ -21,7 +25,7 @@ If no cover is available from the player or the Cover Art Archive, no large imag
 - A music player that exposes MPRIS metadata
 - The Discord desktop application
 
-The Python dependencies are installed from `requirements.txt`. No Cairo, PyGObject, or Playerctl development packages are required.
+The Python dependencies are declared in `pyproject.toml`.
 
 ## Setup
 
@@ -32,7 +36,7 @@ git clone https://github.com/MarM25/discord-mpris.git
 cd discord-mpris
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
+python3 -m pip install -e .
 ```
 
 ### Discord application
@@ -50,13 +54,7 @@ Keep Discord open, activate the virtual environment, then start the service:
 
 ```bash
 source .venv/bin/activate
-python -m discord_mpris
-```
-
-Alternatively, run the installed command:
-
-```bash
-discord-mpris
+python3 -m discord_mpris
 ```
 
 Press `Ctrl+C` to stop it. The service clears the Discord activity when no playing or paused MPRIS player is available.

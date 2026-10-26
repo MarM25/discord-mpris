@@ -6,12 +6,23 @@ build-backend = "setuptools.build_meta"
 name = "discord-mpris"
 version = "0.1.0"
 description = "Show MPRIS music playback as Discord Rich Presence"
+license = "MIT"
+license-files = ["LICENSE.txt"]
+keywords = ["discord", "mpris"]
+authors = [
+    {name = "marm25"},
+]
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "dbus-fast==5.2.0",
     "pypresence==4.6.2",
 ]
+
+[project.urls]
+Documentation = "https://github.com/MarM25/discord-mpris"
+Repository = "https://github.com/MarM25/discord-mpris.git"
+"Bug Tracker" = "https://github.com/MarM25/discord-mpris/issues"
 
 [project.scripts]
 discord-mpris = "discord_mpris.service:run"
