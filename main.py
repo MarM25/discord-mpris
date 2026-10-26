@@ -1,8 +1,14 @@
 """Show the current MPRIS track as Discord Rich Presence."""
 
 import asyncio
+import json
+import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from dbus_fast import BusType, Message, MessageType, Variant
 from dbus_fast.aio import MessageBus
@@ -19,6 +25,9 @@ PROPERTIES_INTERFACE = "org.freedesktop.DBus.Properties"
 RPC = Presence("440997014315204609")
 RPC_EXECUTOR = ThreadPoolExecutor(max_workers=1)
 REFRESH_LOCK = asyncio.Lock()
+MUSICBRAINZ_CACHE = {}
+MUSICBRAINZ_LAST_REQUEST = 0.0
+USER_AGENT = "discord-mpris/0.1 (https://github.com/MarM25/discord-mpris)"
 
 
 async def rpc_call(method, *args, **kwargs):
@@ -64,6 +73,80 @@ def unwrap(value):
     return value
 
 
+def normalize_text(value):
+    return " ".join(value.casefold().split())
+
+
+def escape_musicbrainz_term(value):
+    return re.sub(r'([+\-&|!(){}\[\]^"~*?:\\/])', r"\\\1", value)
+
+
+def fetch_cover_art(artists, album):
+    query = (
+        f'release:"{escape_musicbrainz_term(album)}" AND '
+        f'artist:"{escape_musicbrainz_term(artists[0])}"'
+    )
+    search_url = "https://musicbrainz.org/ws/2/release/?" + urlencode(
+        {"query": query, "fmt": "json", "limit": 10}
+    )
+    request = Request(search_url, headers={"User-Agent": USER_AGENT})
+    with urlopen(request, timeout=8) as response:
+        releases = json.load(response).get("releases", [])
+
+    wanted_artists = {normalize_text(artist) for artist in artists}
+    for release in releases:
+        if normalize_text(release.get("title", "")) != normalize_text(album):
+            continue
+
+        release_artists = {
+            normalize_text(credit.get("name") or credit.get("artist", {}).get("name", ""))
+            for credit in release.get("artist-credit", [])
+            if isinstance(credit, dict)
+        }
+        if not wanted_artists.intersection(release_artists):
+            continue
+
+        release_id = release.get("id")
+        if not release_id:
+            continue
+
+        cover_url = f"https://coverartarchive.org/release/{release_id}/front-500"
+        cover_request = Request(cover_url, headers={"User-Agent": USER_AGENT}, method="HEAD")
+        try:
+            with urlopen(cover_request, timeout=8):
+                return cover_url
+        except HTTPError as error:
+            if error.code != 404:
+                raise
+
+    return None
+
+
+async def find_cover_art(artists, album):
+    global MUSICBRAINZ_LAST_REQUEST
+
+    if not artists or not album:
+        return None
+
+    cache_key = (tuple(normalize_text(artist) for artist in artists), normalize_text(album))
+    if cache_key in MUSICBRAINZ_CACHE:
+        return MUSICBRAINZ_CACHE[cache_key]
+
+    delay = 1.0 - (time.monotonic() - MUSICBRAINZ_LAST_REQUEST)
+    if delay > 0:
+        await asyncio.sleep(delay)
+    MUSICBRAINZ_LAST_REQUEST = time.monotonic()
+
+    try:
+        cover_url = await asyncio.to_thread(fetch_cover_art, artists, album)
+    except (OSError, ValueError, TimeoutError) as error:
+        print(f"Cover lookup failed: {error}")
+        cover_url = None
+
+    MUSICBRAINZ_CACHE[cache_key] = cover_url
+    return cover_url
+
+
 async def get_player_presence(bus):
     names = await call_bus(
         bus, DBUS_SERVICE, DBUS_PATH, DBUS_INTERFACE, "ListNames"
@@ -98,11 +181,20 @@ async def get_player_presence(bus):
             artists = [artists]
         artist = ", ".join(artists)
         song = " - ".join(part for part in (title, artist) if part)
-        players.append((status, song, name))
+        players.append(
+            {
+                "status": status,
+                "song": song,
+                "name": name,
+                "artists": artists,
+                "album": metadata.get("xesam:album"),
+                "art_url": metadata.get("mpris:artUrl"),
+            }
+        )
 
-    return next((player for player in players if player[0] == "Playing"), None) or next(
-        iter(players), None
-    )
+    return next(
+        (player for player in players if player["status"] == "Playing"), None
+    ) or next(iter(players), None)
 
 
 async def send_rpc(method, *args, **kwargs):
@@ -121,22 +213,34 @@ async def refresh_presence(bus):
             await send_rpc(RPC.clear)
             return
 
-        status, song, _name = player
+        status = player["status"]
+        song = player["song"]
+        cover_url = player["art_url"]
+        if not isinstance(cover_url, str) or not cover_url.startswith("https://"):
+            cover_url = await find_cover_art(player["artists"], player["album"])
+
+        label = "Listen" if status == "Playing" else "Paused"
+        activity_name = f"{label}: {song}" if song else "Music"
+        if len(activity_name) > 128:
+            activity_name = activity_name[:125].rstrip() + "..."
+
         if status == "Playing":
             await send_rpc(
                 RPC.update,
+                name=activity_name,
                 state="Playing",
                 details=song or "Listening to music",
-                large_image="music",
+                large_image=cover_url,
                 large_text=song or "Music",
                 small_image="play",
             )
         else:
             await send_rpc(
                 RPC.update,
+                name=activity_name,
                 state="Paused",
                 details=song or "Music",
-                large_image="music",
+                large_image=cover_url,
                 large_text=song or "Music",
                 small_image="pause",
             )

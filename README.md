@@ -7,11 +7,12 @@ It works with MPRIS-compatible players on GNOME, KDE, and other Linux desktops, 
 ## Features
 
 - Shows the current track and artist in Discord.
+- Uses the player's cover URL when available, then tries MusicBrainz and the Cover Art Archive.
 - Updates when playback or track metadata changes.
 - Shows whether playback is active or paused.
 - Prefers a playing player when more than one MPRIS player is available.
 
-Album-cover lookup is not implemented. The activity uses image assets configured for the Discord application.
+If no cover is available from the player or the Cover Art Archive, no large image is set. Cover lookup requires an internet connection. Results, including misses, are cached until the service exits.
 
 ## Requirements
 
@@ -36,11 +37,11 @@ python -m pip install -r requirements.txt
 
 ### Discord application
 
-The service uses a Discord Application ID and the image asset keys `music`, `play`, and `pause`.
+The service uses a Discord Application ID and the image asset keys `play` and `pause` for playback status. Cover art is looked up per album.
 
 1. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications).
 2. Copy its Application ID into the `Presence(...)` call in `main.py`.
-3. Add image assets named `music`, `play`, and `pause` under **Rich Presence > Art Assets** in the application settings.
+3. Add image assets named `play` and `pause` under **Rich Presence > Art Assets** in the application settings.
 4. In Discord, enable **User Settings > Activity Privacy > Share your detected activities with others**.
 
 ## Run
